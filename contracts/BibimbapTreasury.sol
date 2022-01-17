@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-import "./interfaces/IOtterTreasury.sol";
+import "./interfaces/IBibimbapTreasury.sol";
 
 import "./types/Ownable.sol";
 import "./types/ERC20.sol";
@@ -9,7 +9,7 @@ import "./types/ERC20.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SafeERC20.sol";
 
-interface ICLAMERC20 {
+interface IBBBERC20 {
     function burnFrom(address account_, uint256 amount_) external;
 }
 
@@ -17,7 +17,7 @@ interface IBondCalculator {
   function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
 }
 
-contract OtterTreasury is Ownable, IOtterTreasury {
+contract BibimbapTreasury is Ownable, IBibimbapTreasury {
 
     using SafeMath for uint;
     using SafeERC20 for IERC20;
@@ -33,9 +33,9 @@ contract OtterTreasury is Ownable, IOtterTreasury {
     event ChangeQueued( MANAGING indexed managing, address queued );
     event ChangeActivated( MANAGING indexed managing, address activated, bool result );
 
-    enum MANAGING { RESERVEDEPOSITOR, RESERVESPENDER, RESERVETOKEN, RESERVEMANAGER, LIQUIDITYDEPOSITOR, LIQUIDITYTOKEN, LIQUIDITYMANAGER, DEBTOR, REWARDMANAGER, SCLAM }
+    enum MANAGING { RESERVEDEPOSITOR, RESERVESPENDER, RESERVETOKEN, RESERVEMANAGER, LIQUIDITYDEPOSITOR, LIQUIDITYTOKEN, LIQUIDITYMANAGER, DEBTOR, REWARDMANAGER, SBBB }
 
-    address public immutable CLAM;
+    address public immutable BBB;
     uint public immutable blocksNeededForQueue;
 
     address[] public reserveTokens; // Push only, beware false-positives.
@@ -77,34 +77,34 @@ contract OtterTreasury is Ownable, IOtterTreasury {
     mapping( address => bool ) public isRewardManager;
     mapping( address => uint ) public rewardManagerQueue; // Delays changes to mapping.
 
-    address public sCLAM;
-    uint public sCLAMQueue; // Delays change to sCLAM address
+    address public sBBB;
+    uint public sBBBQueue; // Delays change to sBBB address
 
     uint public totalReserves; // Risk-free value of all assets
     uint public totalDebt;
 
     constructor (
-        address _CLAM,
+        address _BBB,
         address _DAI,
-        address _CLAMDAI,
+        address _BBBDAI,
         address _bondCalculator,
         uint _blocksNeededForQueue
     ) {
-        require( _CLAM != address(0) );
-        CLAM = _CLAM;
+        require( _BBB != address(0) );
+        BBB = _BBB;
 
         isReserveToken[ _DAI ] = true;
         reserveTokens.push( _DAI );
 
-        isLiquidityToken[ _CLAMDAI ] = true;
-        liquidityTokens.push( _CLAMDAI );
-        bondCalculator[_CLAMDAI] = _bondCalculator;
+        isLiquidityToken[ _BBBDAI ] = true;
+        liquidityTokens.push( _BBBDAI );
+        bondCalculator[_BBBDAI] = _bondCalculator;
 
         blocksNeededForQueue = _blocksNeededForQueue;
     }
 
     /**
-        @notice allow approved address to deposit an asset for CLAM
+        @notice allow approved address to deposit an asset for BBB
         @param _amount uint
         @param _token address
         @param _profit uint
@@ -121,9 +121,9 @@ contract OtterTreasury is Ownable, IOtterTreasury {
         }
 
         uint value = valueOfToken(_token, _amount);
-        // mint CLAM needed and store amount of rewards for distribution
+        // mint BBB needed and store amount of rewards for distribution
         send_ = value.sub( _profit );
-        IERC20Mintable( CLAM ).mint( msg.sender, send_ );
+        IERC20Mintable( BBB ).mint( msg.sender, send_ );
 
         totalReserves = totalReserves.add( value );
         emit ReservesUpdated( totalReserves );
@@ -132,7 +132,7 @@ contract OtterTreasury is Ownable, IOtterTreasury {
     }
 
     /**
-        @notice allow approved address to burn CLAM for reserves
+        @notice allow approved address to burn BBB for reserves
         @param _amount uint
         @param _token address
      */
@@ -141,7 +141,7 @@ contract OtterTreasury is Ownable, IOtterTreasury {
         require( isReserveSpender[ msg.sender ] == true, "Not approved" );
 
         uint value = valueOfToken( _token, _amount );
-        ICLAMERC20( CLAM ).burnFrom( msg.sender, value );
+        IBBBERC20( BBB ).burnFrom( msg.sender, value );
 
         totalReserves = totalReserves.sub( value );
         emit ReservesUpdated( totalReserves );
@@ -162,7 +162,7 @@ contract OtterTreasury is Ownable, IOtterTreasury {
 
         uint value = valueOfToken( _token, _amount );
 
-        uint maximumDebt = IERC20( sCLAM ).balanceOf( msg.sender ); // Can only borrow against sCLAM held
+        uint maximumDebt = IERC20( sBBB ).balanceOf( msg.sender ); // Can only borrow against sBBB held
         uint availableDebt = maximumDebt.sub( debtorBalance[ msg.sender ] );
         require( value <= availableDebt, "Exceeds debt limit" );
 
@@ -199,18 +199,18 @@ contract OtterTreasury is Ownable, IOtterTreasury {
     }
 
     /**
-        @notice allow approved address to repay borrowed reserves with CLAM
+        @notice allow approved address to repay borrowed reserves with BBB
         @param _amount uint
      */
-    function repayDebtWithCLAM( uint _amount ) external {
+    function repayDebtWithBBB( uint _amount ) external {
         require( isDebtor[ msg.sender ], "Not approved" );
 
-        ICLAMERC20( CLAM ).burnFrom( msg.sender, _amount );
+        IBBBERC20( BBB ).burnFrom( msg.sender, _amount );
 
         debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( _amount );
         totalDebt = totalDebt.sub( _amount );
 
-        emit RepayDebt( msg.sender, CLAM, _amount, _amount );
+        emit RepayDebt( msg.sender, BBB, _amount, _amount );
     }
 
     /**
@@ -243,7 +243,7 @@ contract OtterTreasury is Ownable, IOtterTreasury {
         require( isRewardManager[ msg.sender ], "Not approved" );
         require( _amount <= excessReserves(), "Insufficient reserves" );
 
-        IERC20Mintable( CLAM ).mint( _recipient, _amount );
+        IERC20Mintable( BBB ).mint( _recipient, _amount );
 
         emit RewardsMinted( msg.sender, _recipient, _amount );
     }
@@ -253,7 +253,7 @@ contract OtterTreasury is Ownable, IOtterTreasury {
         @return uint
      */
     function excessReserves() public override view returns ( uint ) {
-        return totalReserves.sub( IERC20( CLAM ).totalSupply().sub( totalDebt ) );
+        return totalReserves.sub( IERC20( BBB ).totalSupply().sub( totalDebt ) );
     }
 
     /**
@@ -278,15 +278,15 @@ contract OtterTreasury is Ownable, IOtterTreasury {
     }
 
     /**
-        @notice returns CLAM valuation of asset
+        @notice returns BBB valuation of asset
         @param _token address
         @param _amount uint
         @return value_ uint
      */
     function valueOfToken( address _token, uint _amount ) public view override returns ( uint value_ ) {
         if ( isReserveToken[ _token ] ) {
-            // convert amount to match CLAM decimals
-            value_ = _amount.mul( 10 ** IERC20( CLAM ).decimals() ).div( 10 ** IERC20( _token ).decimals() );
+            // convert amount to match BBB decimals
+            value_ = _amount.mul( 10 ** IERC20( BBB ).decimals() ).div( 10 ** IERC20( _token ).decimals() );
         } else if ( isLiquidityToken[ _token ] ) {
             value_ = IBondCalculator( bondCalculator[ _token ] ).valuation( _token, _amount );
         }
@@ -318,8 +318,8 @@ contract OtterTreasury is Ownable, IOtterTreasury {
             debtorQueue[ _address ] = block.number.add( blocksNeededForQueue );
         } else if ( _managing == MANAGING.REWARDMANAGER ) { // 8
             rewardManagerQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.SCLAM ) { // 9
-            sCLAMQueue = block.number.add( blocksNeededForQueue );
+        } else if ( _managing == MANAGING.SBBB ) { // 9
+            sBBBQueue = block.number.add( blocksNeededForQueue );
         } else return false;
 
         emit ChangeQueued( _managing, _address );
@@ -429,9 +429,9 @@ contract OtterTreasury is Ownable, IOtterTreasury {
             result = !isRewardManager[ _address ];
             isRewardManager[ _address ] = result;
 
-        } else if ( _managing == MANAGING.SCLAM ) { // 9
-            sCLAMQueue = 0;
-            sCLAM = _address;
+        } else if ( _managing == MANAGING.SBBB ) { // 9
+            sBBBQueue = 0;
+            sBBB = _address;
             result = true;
 
         } else return false;

@@ -4,7 +4,7 @@ pragma solidity ^0.8.2;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract BibimbapFinanceNFT is ERC1155, Ownable {
+contract BibimbapKakarotNFT is ERC1155, Ownable {
     constructor()
         ERC1155("ipfs://QmZfQkhnHcT24BRZkgFMdbwkGNa43GsPrStmmcbFnBqMjN")
     {}

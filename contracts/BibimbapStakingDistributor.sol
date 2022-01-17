@@ -2,7 +2,7 @@
 
 pragma solidity 0.7.5;
 
-import "./interfaces/IOtterTreasury.sol";
+import "./interfaces/IBibimbapTreasury.sol";
 
 import "./types/ERC20.sol";
 import "./types/Ownable.sol";
@@ -10,14 +10,14 @@ import "./types/Ownable.sol";
 import "./libraries/SafeERC20.sol";
 
 
-contract OtterStakingDistributor is Ownable {
+contract BibimbapStakingDistributor is Ownable {
 
     using SafeMath for uint;
     using SafeERC20 for IERC20;
 
     /* ====== VARIABLES ====== */
 
-    address public immutable CLAM;
+    address public immutable BBB;
     address public immutable treasury;
 
     uint public immutable epochLength; // seconds
@@ -44,11 +44,11 @@ contract OtterStakingDistributor is Ownable {
 
     /* ====== CONSTRUCTOR ====== */
 
-    constructor( address _treasury, address _clam, uint _epochLength, uint _nextEpochTime ) {
+    constructor( address _treasury, address _bbb, uint _epochLength, uint _nextEpochTime ) {
         require( _treasury != address(0) );
         treasury = _treasury;
-        require( _clam != address(0) );
-        CLAM = _clam;
+        require( _bbb != address(0) );
+        BBB = _bbb;
         epochLength = _epochLength;
         nextEpochTime = _nextEpochTime;
     }
@@ -67,7 +67,7 @@ contract OtterStakingDistributor is Ownable {
             // distribute rewards to each recipient
             for ( uint i = 0; i < info.length; i++ ) {
                 if ( info[ i ].rate > 0 ) {
-                    IOtterTreasury( treasury ).mintRewards( // mint and send from treasury
+                    IBibimbapTreasury( treasury ).mintRewards( // mint and send from treasury
                         info[ i ].recipient,
                         nextRewardAt( info[ i ].rate )
                     );
@@ -114,7 +114,7 @@ contract OtterStakingDistributor is Ownable {
         @return uint
      */
     function nextRewardAt( uint _rate ) public view returns ( uint ) {
-        return IERC20( CLAM ).totalSupply().mul( _rate ).div( 1000000 );
+        return IERC20( BBB ).totalSupply().mul( _rate ).div( 1000000 );
     }
 
     /**

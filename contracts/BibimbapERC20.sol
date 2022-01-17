@@ -26,11 +26,11 @@ contract VaultOwned is Ownable {
 
 }
 
-contract OtterClamERC20 is ERC20Permit, VaultOwned {
+contract BibimbapERC20 is ERC20Permit, VaultOwned {
 
     using SafeMath for uint256;
 
-    constructor() ERC20("Otter Clam", "CLAM", 9) {
+    constructor() ERC20("Bibimbap", "BBB", 9) {
     }
 
     function mint(address account_, uint256 amount_) external onlyVault() {

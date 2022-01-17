@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-import "./interfaces/IOtterTreasury.sol";
-import "./interfaces/IOtterStaking.sol";
-import "./interfaces/IOtterBondingCalculator.sol";
-import "./interfaces/IsCLAM.sol";
+import "./interfaces/IBibimbapTreasury.sol";
+import "./interfaces/IBibimbapStaking.sol";
+import "./interfaces/IBibimbapBondingCalculator.sol";
+import "./interfaces/IsBBB.sol";
 
 import "./types/Ownable.sol";
 
@@ -13,7 +13,7 @@ import "./libraries/Math.sol";
 import "./libraries/FixedPoint.sol";
 import "./libraries/SafeERC20.sol";
 
-contract OtterBondStakeDepository is Ownable {
+contract BibimbapBondStakeDepository is Ownable {
     using FixedPoint for *;
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -45,10 +45,10 @@ contract OtterBondStakeDepository is Ownable {
 
     /* ======== STATE VARIABLES ======== */
 
-    address public immutable CLAM; // intermediate reward token from treasury
-    address public immutable sCLAM; // token given as payment for bond
+    address public immutable BBB; // intermediate reward token from treasury
+    address public immutable sBBB; // token given as payment for bond
     address public immutable principle; // token used to create bond
-    address public immutable treasury; // mints CLAM when receives principle
+    address public immutable treasury; // mints BBB when receives principle
     address public immutable DAO; // receives profit share from bond
 
     bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
@@ -78,11 +78,11 @@ contract OtterBondStakeDepository is Ownable {
 
     // Info for bond holder
     struct Bond {
-        uint256 payout; //clam at the moment of bond
+        uint256 payout; //BBB at the moment of bond
         uint256 vesting; // Blocks left to vest
         uint256 lastTimestamp; // Last interaction
         uint256 pricePaid; // In DAI, for front end viewing
-        uint256 gonsPayout; // sCLAM gons remaining to be paid
+        uint256 gonsPayout; // sBBB gons remaining to be paid
     }
 
     // Info for incremental adjustments to control variable
@@ -97,17 +97,17 @@ contract OtterBondStakeDepository is Ownable {
     /* ======== INITIALIZATION ======== */
 
     constructor(
-        address _CLAM,
-        address _sCLAM,
+        address _BBB,
+        address _sBBB,
         address _principle,
         address _treasury,
         address _DAO,
         address _bondCalculator
     ) {
-        require(_CLAM != address(0));
-        CLAM = _CLAM;
-        require(_sCLAM != address(0));
-        sCLAM = _sCLAM;
+        require(_BBB != address(0));
+        BBB = _BBB;
+        require(_sBBB != address(0));
+        sBBB = _sBBB;
         require(_principle != address(0));
         principle = _principle;
         require(_treasury != address(0));
@@ -249,13 +249,13 @@ contract OtterBondStakeDepository is Ownable {
             "Slippage limit: more than max price"
         ); // slippage protection
 
-        uint256 value = IOtterTreasury(treasury).valueOfToken(
+        uint256 value = IBibimbapTreasury(treasury).valueOfToken(
             principle,
             _amount
         );
         uint256 payout = payoutFor(value); // payout to bonder is computed
 
-        require(payout >= 10000000, "Bond too small"); // must be > 0.01 CLAM ( underflow protection )
+        require(payout >= 10000000, "Bond too small"); // must be > 0.01 BBB ( underflow protection )
         require(payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
 
         // profits are calculated
@@ -264,21 +264,21 @@ contract OtterBondStakeDepository is Ownable {
 
         IERC20(principle).safeTransferFrom(msg.sender, address(this), _amount);
         IERC20(principle).approve(address(treasury), _amount);
-        IOtterTreasury(treasury).deposit(_amount, principle, profit);
+        IBibimbapTreasury(treasury).deposit(_amount, principle, profit);
 
         if (fee != 0) {
             // fee is transferred to dao
-            IERC20(CLAM).safeTransfer(DAO, fee);
+            IERC20(BBB).safeTransfer(DAO, fee);
         }
 
         // total debt is increased
         totalDebt = totalDebt.add(value);
 
-        IERC20(CLAM).approve(staking, payout);
-        IOtterStaking(staking).stake(payout, address(this));
-        IOtterStaking(staking).claim(address(this));
+        IERC20(BBB).approve(staking, payout);
+        IBibimbapStaking(staking).stake(payout, address(this));
+        IBibimbapStaking(staking).claim(address(this));
 
-        uint256 stakeGons = IsCLAM(sCLAM).gonsForBalance(payout);
+        uint256 stakeGons = IsBBB(sBBB).gonsForBalance(payout);
         // depositor info is stored
         bondInfo[_depositor] = Bond({
             gonsPayout: bondInfo[_depositor].gonsPayout.add(stakeGons),
@@ -316,9 +316,9 @@ contract OtterBondStakeDepository is Ownable {
 
         require(percentVested >= 10000, "not fully vested"); // if fully vested
         delete bondInfo[_recipient]; // delete user info
-        uint256 _amount = IsCLAM(sCLAM).balanceForGons(info.gonsPayout);
+        uint256 _amount = IsBBB(sBBB).balanceForGons(info.gonsPayout);
         emit BondRedeemed(_recipient, _amount, 0); // emit bond data
-        IERC20(sCLAM).transfer(_recipient, _amount); // pay user everything due
+        IERC20(sBBB).transfer(_recipient, _amount); // pay user everything due
         return _amount;
     }
 
@@ -371,7 +371,7 @@ contract OtterBondStakeDepository is Ownable {
      *  @return uint
      */
     function maxPayout() public view returns (uint256) {
-        return IERC20(CLAM).totalSupply().mul(terms.maxPayout).div(100000);
+        return IERC20(BBB).totalSupply().mul(terms.maxPayout).div(100000);
     }
 
     /**
@@ -422,7 +422,7 @@ contract OtterBondStakeDepository is Ownable {
         if (isLiquidityBond) {
             price_ = bondPrice()
                 .mul(
-                    IOtterBondingCalculator(bondCalculator).markdown(principle)
+                    IBibimbapBondingCalculator(bondCalculator).markdown(principle)
                 )
                 .div(100);
         } else {
@@ -431,11 +431,11 @@ contract OtterBondStakeDepository is Ownable {
     }
 
     /**
-     *  @notice calculate current ratio of debt to CLAM supply
+     *  @notice calculate current ratio of debt to BBB supply
      *  @return debtRatio_ uint
      */
     function debtRatio() public view returns (uint256 debtRatio_) {
-        uint256 supply = IERC20(CLAM).totalSupply();
+        uint256 supply = IERC20(BBB).totalSupply();
         debtRatio_ = FixedPoint
             .fraction(currentDebt().mul(1e9), supply)
             .decode112with18()
@@ -451,7 +451,7 @@ contract OtterBondStakeDepository is Ownable {
             return
                 debtRatio()
                     .mul(
-                        IOtterBondingCalculator(bondCalculator).markdown(
+                        IBibimbapBondingCalculator(bondCalculator).markdown(
                             principle
                         )
                     )
@@ -503,7 +503,7 @@ contract OtterBondStakeDepository is Ownable {
     }
 
     /**
-     *  @notice calculate amount of CLAM available for claim by depositor
+     *  @notice calculate amount of BBB available for claim by depositor
      *  @param _depositor address
      *  @return pendingPayout_ uint
      */
@@ -513,7 +513,7 @@ contract OtterBondStakeDepository is Ownable {
         returns (uint256 pendingPayout_)
     {
         uint256 percentVested = percentVestedFor(_depositor);
-        uint256 payout = IsCLAM(sCLAM).balanceForGons(
+        uint256 payout = IsBBB(sBBB).balanceForGons(
             bondInfo[_depositor].gonsPayout
         );
 
@@ -527,12 +527,12 @@ contract OtterBondStakeDepository is Ownable {
     /* ======= AUXILLIARY ======= */
 
     /**
-     *  @notice allow anyone to send lost tokens (excluding principle or CLAM) to the DAO
+     *  @notice allow anyone to send lost tokens (excluding principle or BBB) to the DAO
      *  @return bool
      */
     function recoverLostToken(address _token) external returns (bool) {
-        require(_token != CLAM);
-        require(_token != sCLAM);
+        require(_token != BBB);
+        require(_token != sBBB);
         require(_token != principle);
         IERC20(_token).safeTransfer(
             DAO,

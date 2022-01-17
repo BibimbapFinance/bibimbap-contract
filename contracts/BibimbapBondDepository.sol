@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-import "./interfaces/IOtterTreasury.sol";
-import "./interfaces/IOtterStaking.sol";
-import "./interfaces/IOtterBondingCalculator.sol";
+import "./interfaces/IBibimbapTreasury.sol";
+import "./interfaces/IBibimbapStaking.sol";
+import "./interfaces/IBibimbapBondingCalculator.sol";
 
 import "./types/Ownable.sol";
 
@@ -16,7 +16,7 @@ interface IStakingHelper {
     function stake( uint _amount, address _recipient ) external;
 }
 
-contract OtterBondDepository is Ownable {
+contract BibimbapBondDepository is Ownable {
 
     using FixedPoint for *;
     using SafeERC20 for IERC20;
@@ -29,9 +29,9 @@ contract OtterBondDepository is Ownable {
     event ControlVariableAdjustment( uint initialBCV, uint newBCV, uint adjustment, bool addition );
 
     /* ======== STATE VARIABLES ======== */
-    address public immutable CLAM; // token given as payment for bond
+    address public immutable BBB; // token given as payment for bond
     address public immutable principle; // token used to create bond
-    address public immutable treasury; // mints CLAM when receives principle
+    address public immutable treasury; // mints BBB when receives principle
     address public immutable DAO; // receives profit share from bond
 
     bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
@@ -64,7 +64,7 @@ contract OtterBondDepository is Ownable {
 
     // Info for bond holder
     struct Bond {
-        uint payout; // CLAM remaining to be paid
+        uint payout; // BBB remaining to be paid
         uint vesting; // Blocks left to vest
         uint lastTimestamp; // Last interaction
         uint pricePaid; // In DAI, for front end viewing
@@ -83,14 +83,14 @@ contract OtterBondDepository is Ownable {
     /* ======== INITIALIZATION ======== */
 
     constructor (
-        address _CLAM,
+        address _BBB,
         address _principle,
         address _treasury,
         address _DAO,
         address _bondCalculator
     ) {
-        require( _CLAM != address(0) );
-        CLAM = _CLAM;
+        require( _BBB != address(0) );
+        BBB = _BBB;
         require( _principle != address(0) );
         principle = _principle;
         require( _treasury != address(0) );
@@ -225,10 +225,10 @@ contract OtterBondDepository is Ownable {
 
         require( _maxPrice >= nativePrice, "Slippage limit: more than max price" ); // slippage protection
 
-        uint value = IOtterTreasury( treasury ).valueOfToken( principle, _amount );
+        uint value = IBibimbapTreasury( treasury ).valueOfToken( principle, _amount );
         uint payout = payoutFor( value ); // payout to bonder is computed
 
-        require( payout >= 10000000, "Bond too small" ); // must be > 0.01 CLAM ( underflow protection )
+        require( payout >= 10000000, "Bond too small" ); // must be > 0.01 BBB ( underflow protection )
         require( payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
 
         // profits are calculated
@@ -238,14 +238,14 @@ contract OtterBondDepository is Ownable {
         /**
             principle is transferred in
             approved and
-            deposited into the treasury, returning (_amount - profit) CLAM
+            deposited into the treasury, returning (_amount - profit) BBB
          */
         IERC20( principle ).safeTransferFrom( msg.sender, address(this), _amount );
         IERC20( principle ).approve( address( treasury ), _amount );
-        IOtterTreasury( treasury ).deposit( _amount, principle, profit );
+        IBibimbapTreasury( treasury ).deposit( _amount, principle, profit );
 
         if ( fee != 0 ) { // fee is transferred to dao
-            IERC20( CLAM ).safeTransfer( DAO, fee );
+            IERC20( BBB ).safeTransfer( DAO, fee );
         }
 
         // total debt is increased
@@ -312,14 +312,14 @@ contract OtterBondDepository is Ownable {
      */
     function stakeOrSend( address _recipient, bool _stake, uint _amount ) internal returns ( uint ) {
         if ( !_stake ) { // if user does not want to stake
-            IERC20( CLAM ).transfer( _recipient, _amount ); // send payout
+            IERC20( BBB ).transfer( _recipient, _amount ); // send payout
         } else { // if user wants to stake
             if ( useHelper ) { // use if staking warmup is 0
-                IERC20( CLAM ).approve( stakingHelper, _amount );
+                IERC20( BBB ).approve( stakingHelper, _amount );
                 IStakingHelper( stakingHelper ).stake( _amount, _recipient );
             } else {
-                IERC20( CLAM ).approve( staking, _amount );
-                IOtterStaking( staking ).stake( _amount, _recipient );
+                IERC20( BBB ).approve( staking, _amount );
+                IBibimbapStaking( staking ).stake( _amount, _recipient );
             }
         }
         return _amount;
@@ -363,7 +363,7 @@ contract OtterBondDepository is Ownable {
      *  @return uint
      */
     function maxPayout() public view returns ( uint ) {
-        return IERC20( CLAM ).totalSupply().mul( terms.maxPayout ).div( 100000 );
+        return IERC20( BBB ).totalSupply().mul( terms.maxPayout ).div( 100000 );
     }
 
     /**
@@ -406,7 +406,7 @@ contract OtterBondDepository is Ownable {
      */
     function bondPriceInUSD() public view returns ( uint price_ ) {
         if( isLiquidityBond ) {
-            price_ = bondPrice().mul( IOtterBondingCalculator( bondCalculator ).markdown( principle ) ).div( 100 );
+            price_ = bondPrice().mul( IBibimbapBondingCalculator( bondCalculator ).markdown( principle ) ).div( 100 );
         } else {
             price_ = bondPrice().mul( 10 ** IERC20( principle ).decimals() ).div( 100 );
         }
@@ -414,11 +414,11 @@ contract OtterBondDepository is Ownable {
 
 
     /**
-     *  @notice calculate current ratio of debt to CLAM supply
+     *  @notice calculate current ratio of debt to BBB supply
      *  @return debtRatio_ uint
      */
     function debtRatio() public view returns ( uint debtRatio_ ) {
-        uint supply = IERC20( CLAM ).totalSupply();
+        uint supply = IERC20( BBB ).totalSupply();
         debtRatio_ = FixedPoint.fraction(
             currentDebt().mul( 1e9 ),
             supply
@@ -431,7 +431,7 @@ contract OtterBondDepository is Ownable {
      */
     function standardizedDebtRatio() external view returns ( uint ) {
         if ( isLiquidityBond ) {
-            return debtRatio().mul( IOtterBondingCalculator( bondCalculator ).markdown( principle ) ).div( 1e9 );
+            return debtRatio().mul( IBibimbapBondingCalculator( bondCalculator ).markdown( principle ) ).div( 1e9 );
         } else {
             return debtRatio();
         }
@@ -449,7 +449,7 @@ contract OtterBondDepository is Ownable {
      *  @notice amount to decay total debt by
      *  @return decay_ uint
      */
-    function debtDecay() public view returns ( uint decay_ ) {
+    function debtDecay() public view returns ( uint decay_ ) {  
         uint secondsSinceLast = block.timestamp.sub( lastDecay );
         decay_ = totalDebt.mul( secondsSinceLast ).div( terms.vestingTerm );
         if ( decay_ > totalDebt ) {
@@ -476,7 +476,7 @@ contract OtterBondDepository is Ownable {
     }
 
     /**
-     *  @notice calculate amount of CLAM available for claim by depositor
+     *  @notice calculate amount of BBB available for claim by depositor
      *  @param _depositor address
      *  @return pendingPayout_ uint
      */
@@ -497,11 +497,11 @@ contract OtterBondDepository is Ownable {
     /* ======= AUXILLIARY ======= */
 
     /**
-     *  @notice allow anyone to send lost tokens (excluding principle or CLAM) to the DAO
+     *  @notice allow anyone to send lost tokens (excluding principle or BBB) to the DAO
      *  @return bool
      */
     function recoverLostToken( address _token ) external returns ( bool ) {
-        require( _token != CLAM );
+        require( _token != BBB );
         require( _token != principle );
         IERC20( _token ).safeTransfer( DAO, IERC20( _token ).balanceOf( address(this) ) );
         return true;

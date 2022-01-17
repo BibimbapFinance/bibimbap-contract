@@ -52,6 +52,11 @@ module.exports = {
       accounts: [dev],
       gasPrice: 35000000000
     },
+    'ganache': {
+      url: 'http://127.0.0.1:7545',
+      accounts: ['461b3fbb63a4285f2783dc00eae3d26f80cb6625d16516eb2959b89e033845b8'],
+      gasPrice: 35000000000
+    },
     hardhat: {
       // gas: 'auto',
     //   forking:

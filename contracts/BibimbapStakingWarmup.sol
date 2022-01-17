@@ -5,20 +5,20 @@ pragma solidity 0.7.5;
 import "./interfaces/IERC20.sol";
 
 
-contract OtterStakingWarmup {
+contract BibimbapStakingWarmup {
 
     address public immutable staking;
-    address public immutable sCLAM;
+    address public immutable sBBB;
 
-    constructor ( address _staking, address _sCLAM ) {
+    constructor ( address _staking, address _sBBB ) {
         require( _staking != address(0) );
         staking = _staking;
-        require( _sCLAM != address(0) );
-        sCLAM = _sCLAM;
+        require( _sBBB != address(0) );
+        sBBB = _sBBB;
     }
 
     function retrieve( address _staker, uint _amount ) external {
         require( msg.sender == staking );
-        IERC20( sCLAM ).transfer( _staker, _amount );
+        IERC20( sBBB ).transfer( _staker, _amount );
     }
 }

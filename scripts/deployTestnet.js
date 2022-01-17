@@ -1,4 +1,4 @@
-// @dev. This script will deploy this V1.1 of Otter. It will deploy the whole ecosystem.
+// @dev. This script will deploy this V1.1 of Bibimbap. It will deploy the whole ecosystem.
 
 const { ethers } = require('hardhat')
 const { BigNumber, ContractFactory } = ethers
@@ -19,15 +19,15 @@ async function main() {
   const { provider } = deployer
   // TODO: set this to launch date
   // const firstEpochTime = (await provider.getBlock()).timestamp + 30 * 60
-  const firstEpochTime = 1640592000 // 2021-12-27 17:00
+  const firstEpochTime = 1642134160 // 2022-01-05 15:00
   console.log('First epoch timestamp: ' + firstEpochTime)
 
   // What epoch will be first epoch
   const firstEpochNumber = '1'
 
   // How many seconds are in each epoch
-  const epochLengthInSeconds = 86400 / 3
-  // const epochLengthInSeconds = 60 * 10
+  // const epochLengthInSeconds = 86400 / 3
+  const epochLengthInSeconds = 60 // 1/480
 
   // Initial reward rate for epoch
   const initialRewardRate = '5000'
@@ -45,12 +45,13 @@ async function main() {
   const daiBondBCV = '300'
 
   // Bond vesting length in seconds.
-  const bondVestingLength = 5 * 24 * 3600
+  // const bondVestingLength = 5 * 24 * 3600
+  const bondVestingLength = 900
 
   // Min bond price
-  const minBondPrice = '1000'
+  const minBondPrice = '600'
 
-  // Max bond payout, 1000 = 1% of CLAM total supply
+  // Max bond payout, 1000 = 1% of BBB total supply
   const maxBondPayout = '1000'
 
   // DAO fee for bond
@@ -85,44 +86,41 @@ async function main() {
   const dai = await DAI.deploy(80001)
   // const dai = DAI.attach(daiAddr)
   await dai.mint(deployer.address, initialMint);
-  await dai.transfer('0xE51716dB94ec43de4aa66E955f3fC941Cee84472', initialMint/4);
-  await dai.transfer('0xf2a98c5599953c3e4Cdb36781297E5D4d84881c0', initialMint/4);
-  await dai.transfer('0x98cc800c4F5F16C00b506D29A470b04f6938384D', initialMint/4);
   console.log('DAI addr: ' + dai.address)
 
-  // Deploy CLAM
-  const CLAM = await ethers.getContractFactory('OtterClamERC20')
-  const clam = await CLAM.deploy()
-  console.log('CLAM deployed: ' + clam.address)
+  // Deploy BBB
+  const BBB = await ethers.getContractFactory('BibimbapERC20')
+  const bbb = await BBB.deploy()
+  console.log('BBB deployed: ' + bbb.address)
 
-  const ClamCirculatingSupply = await ethers.getContractFactory(
-    'ClamCirculatingSupply'
+  const BBBCirculatingSupply = await ethers.getContractFactory(
+    'BBBCirculatingSupply'
   )
-  const clamCirculatingSupply = await ClamCirculatingSupply.deploy(
+  const bbbCirculatingSupply = await BBBCirculatingSupply.deploy(
     deployer.address
   )
-  await clamCirculatingSupply.deployTransaction.wait()
-  await clamCirculatingSupply.initialize(clam.address)
+  await bbbCirculatingSupply.deployTransaction.wait()
+  await bbbCirculatingSupply.initialize(bbb.address)
 
   const uniswapFactory = new ethers.Contract(
     quickswapFactoryAddr,
     UniswapV2ABI,
     deployer
   )
-  await (await uniswapFactory.createPair(clam.address, dai.address)).wait()
-  const lpAddress = await uniswapFactory.getPair(clam.address, dai.address)
+  await (await uniswapFactory.createPair(bbb.address, dai.address)).wait()
+  const lpAddress = await uniswapFactory.getPair(bbb.address, dai.address)
   console.log('LP created: ' + lpAddress)
 
   // Deploy bonding calc
   const BondingCalculator = await ethers.getContractFactory(
-    'OtterBondingCalculator'
+    'BibimbapBondingCalculator'
   )
-  const bondingCalculator = await BondingCalculator.deploy(clam.address)
+  const bondingCalculator = await BondingCalculator.deploy(bbb.address)
 
   // Deploy treasury
-  const Treasury = await ethers.getContractFactory('OtterTreasury')
+  const Treasury = await ethers.getContractFactory('BibimbapTreasury')
   const treasury = await Treasury.deploy(
-    clam.address,
+    bbb.address,
     dai.address,
     lpAddress,
     bondingCalculator.address,
@@ -132,64 +130,64 @@ async function main() {
 
   // Deploy staking distributor
   const StakingDistributor = await ethers.getContractFactory(
-    'OtterStakingDistributor'
+    'BibimbapStakingDistributor'
   )
   const stakingDistributor = await StakingDistributor.deploy(
     treasury.address,
-    clam.address,
+    bbb.address,
     epochLengthInSeconds,
     firstEpochTime
   )
 
-  // Deploy sCLAM
-  const StakedCLAM = await ethers.getContractFactory('StakedOtterClamERC20')
-  const sCLAM = await StakedCLAM.deploy()
+  // Deploy sBBB
+  const StakedBBB = await ethers.getContractFactory('StakedBibimbapERC20')
+  const sBBB = await StakedBBB.deploy()
 
   // Deploy Staking
-  const Staking = await ethers.getContractFactory('OtterStaking')
+  const Staking = await ethers.getContractFactory('BibimbapStaking')
   const staking = await Staking.deploy(
-    clam.address,
-    sCLAM.address,
+    bbb.address,
+    sBBB.address,
     epochLengthInSeconds,
     firstEpochNumber,
     firstEpochTime
   )
 
   // Deploy staking warmpup
-  const StakingWarmup = await ethers.getContractFactory('OtterStakingWarmup')
+  const StakingWarmup = await ethers.getContractFactory('BibimbapStakingWarmup')
   const stakingWarmup = await StakingWarmup.deploy(
     staking.address,
-    sCLAM.address
+    sBBB.address
   )
 
   // Deploy staking helper
-  const StakingHelper = await ethers.getContractFactory('OtterStakingHelper')
+  const StakingHelper = await ethers.getContractFactory('BibimbapStakingHelper')
   const stakingHelper = await StakingHelper.deploy(
     staking.address,
-    clam.address
+    bbb.address
   )
 
   // Deploy DAI bond
-  const DAIBond = await ethers.getContractFactory('OtterBondDepository')
+  const DAIBond = await ethers.getContractFactory('BibimbapBondDepository')
   const daiBond = await DAIBond.deploy(
-    clam.address,
+    bbb.address,
     dai.address,
     treasury.address,
     daoAddr,
     zeroAddress
   )
 
-  const DaiClamBond = await ethers.getContractFactory('OtterBondDepository')
-  const daiClamBond = await DaiClamBond.deploy(
-    clam.address,
+  const DaiBBBBond = await ethers.getContractFactory('BibimbapBondDepository')
+  const daiBBBBond = await DaiBBBBond.deploy(
+    bbb.address,
     lpAddress,
     treasury.address,
     daoAddr,
     bondingCalculator.address
   )
-  const IDO = await ethers.getContractFactory('OtterClamIDO')
+  const IDO = await ethers.getContractFactory('BibimbapIDO')
   const ido = await IDO.deploy(
-    clam.address,
+    bbb.address,
     dai.address,
     treasury.address,
     staking.address,
@@ -198,25 +196,25 @@ async function main() {
 
   console.log(
     JSON.stringify({
-      sCLAM_ADDRESS: sCLAM.address,
-      CLAM_ADDRESS: clam.address,
+      sBBB_ADDRESS: sBBB.address,
+      BBB_ADDRESS: bbb.address,
       MAI_ADDRESS: dai.address,
       TREASURY_ADDRESS: treasury.address,
-      CLAM_BONDING_CALC_ADDRESS: bondingCalculator.address,
+      BBB_BONDING_CALC_ADDRESS: bondingCalculator.address,
       STAKING_ADDRESS: staking.address,
       STAKING_WARMUP_ADDRESS: stakingWarmup.address,
       STAKING_DISTRIBUTOR_ADDRESS: stakingDistributor.address,
       STAKING_HELPER_ADDRESS: stakingHelper.address,
       RESERVES: {
         MAI: dai.address,
-        MAI_CLAM: lpAddress,
+        MAI_BBB: lpAddress,
       },
       BONDS: {
         MAI: daiBond.address,
-        MAI_CLAM: daiClamBond.address,
+        MAI_BBB: daiBBBBond.address,
       },
       IDO: ido.address,
-      CLAM_CIRCULATING_SUPPLY: clamCirculatingSupply.address,
+      BBB_CIRCULATING_SUPPLY: bbbCirculatingSupply.address,
     })
   )
 
@@ -227,9 +225,9 @@ async function main() {
   await (await treasury.queue('0', deployer.address)).wait()
   await treasury.toggle('0', deployer.address, zeroAddress)
 
-  // queue and toggle DAI-CLAM liquidity depositor
-  await (await treasury.queue('4', daiClamBond.address)).wait()
-  await treasury.toggle('4', daiClamBond.address, zeroAddress)
+  // queue and toggle DAI-BBB liquidity depositor
+  await (await treasury.queue('4', daiBBBBond.address)).wait()
+  await treasury.toggle('4', daiBBBBond.address, zeroAddress)
 
   await (await treasury.queue('4', deployer.address)).wait()
   await treasury.toggle('4', deployer.address, zeroAddress)
@@ -245,8 +243,8 @@ async function main() {
     maxBondDebt,
     initialBondDebt
   )
-  await daiClamBond.initializeBondTerms(
-    '100',
+  await daiBBBBond.initializeBondTerms(
+    '40',
     bondVestingLength,
     minBondPrice,
     maxBondPayout,
@@ -257,19 +255,19 @@ async function main() {
 
   // Set staking for bonds
   await daiBond.setStaking(staking.address, stakingHelper.address)
-  await daiClamBond.setStaking(staking.address, stakingHelper.address)
+  await daiBBBBond.setStaking(staking.address, stakingHelper.address)
 
-  // Initialize sCLAM and set the index
-  await sCLAM.initialize(staking.address)
-  await sCLAM.setIndex(initialIndex)
+  // Initialize sBBB and set the index
+  await sBBB.initialize(staking.address)
+  await sBBB.setIndex(initialIndex)
 
   // set distributor contract and warmup contract
   await staking.setContract('0', stakingDistributor.address)
   await staking.setContract('1', stakingWarmup.address)
   await staking.setWarmup(warmupPeriod)
 
-  // Set treasury for CLAM token
-  await clam.setVault(treasury.address)
+  // Set treasury for BBB token
+  await bbb.setVault(treasury.address)
 
   // Add staking contract as distributor recipient
   await stakingDistributor.addRecipient(staking.address, initialRewardRate)
@@ -278,10 +276,10 @@ async function main() {
   await (await treasury.queue('8', stakingDistributor.address)).wait(1)
   await treasury.toggle('8', stakingDistributor.address, zeroAddress)
 
-  // const Treasury = await ethers.getContractFactory('OtterTreasury')
+  // const Treasury = await ethers.getContractFactory('BibimbapTreasury')
   // const treasury = Treasury.attach('0x12239Ec193A208343F7FEa8410b7a10cb7DFf9A6')
 
-  // const IDO = await ethers.getContractFactory('OtterClamIDO')
+  // const IDO = await ethers.getContractFactory('BibimbapIDO')
   // const ido = await IDO.deploy(
   //   '0xcf2cf9Aee9A2b93a7AF9F2444843AFfDd8C435eb',
   //   '0x19907af68A173080c3e05bb53932B0ED541f6d20',
@@ -314,7 +312,7 @@ async function main() {
   await (await treasury.queue('4', ido.address)).wait(1)
   await treasury.toggle('4', ido.address, zeroAddress)
 
-  // const IDO = await ethers.getContractFactory('OtterClamIDO')
+  // const IDO = await ethers.getContractFactory('BibimbapClamIDO')
   // const ido = IDO.attach('0xC4d9801372e6800D5dBb03eC907CbdDE437bE627')
   // await (await ido.disableWhiteList()).wait()
   // const wallets = []
@@ -332,18 +330,18 @@ async function main() {
     (await dai.approve(treasury.address, largeApproval)).wait(),
     (await dai.approve(daiBond.address, largeApproval)).wait(),
     (await dai.approve(quickRouter.address, largeApproval)).wait(),
-    (await clam.approve(staking.address, largeApproval)).wait(),
-    (await clam.approve(stakingHelper.address, largeApproval)).wait(),
-    (await clam.approve(quickRouter.address, largeApproval)).wait(),
+    (await bbb.approve(staking.address, largeApproval)).wait(),
+    (await bbb.approve(stakingHelper.address, largeApproval)).wait(),
+    (await bbb.approve(quickRouter.address, largeApproval)).wait(),
     (await lp.approve(treasury.address, largeApproval)).wait(),
   ])
 
   // const totalIDODaiAmount = 100 * 10000
-  // const clamMinted = 200000
+  // const bbbMinted = 200000
   // const lpClamAmount = 50000
   // const initialClamPriceInLP = 15
   // const daiInTreasury = totalIDODaiAmount - initialClamPriceInLP * lpClamAmount
-  // const profit = daiInTreasury - clamMinted - lpClamAmount
+  // const profit = daiInTreasury - bbbMinted - lpClamAmount
   // console.log({ daiInTreasury, profit })
 
   // await (
@@ -358,7 +356,7 @@ async function main() {
   // await (
   //   await quickRouter.addLiquidity(
   //     dai.address,
-  //     clam.address,
+  //     bbb.address,
   //     ethers.utils.parseEther(String(lpClamAmount * initialClamPriceInLP)),
   //     ethers.utils.parseUnits(String(lpClamAmount), 9),
   //     ethers.utils.parseEther(String(lpClamAmount * initialClamPriceInLP)),
@@ -373,12 +371,12 @@ async function main() {
   // const valueOfLPToken = await treasury.valueOfToken(lpAddress, lpBalance)
   // await treasury.deposit(lpBalance, lpAddress, valueOfLPToken)
 
-  // Stake CLAM through helper
+  // Stake BBB through helper
   // await stakingHelper.stake(
-  //   BigNumber.from(clamMinted).mul(BigNumber.from(10).pow(9))
+  //   BigNumber.from(bbbMinted).mul(BigNumber.from(10).pow(9))
   // )
 
-  // Bond 1,000 CLAM in each of their bonds
+  // Bond 1,000 BBB in each of their bonds
   //   await daiBond.deposit("1000000000000000000000", "60000", deployer.address);
 }
 

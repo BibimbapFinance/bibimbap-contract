@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-import "./interfaces/IOtterStaking.sol";
-import "./interfaces/IsCLAM.sol";
+import "./interfaces/IBibimbapStaking.sol";
+import "./interfaces/IsBBB.sol";
 
 import "./types/ERC20.sol";
 import "./types/Ownable.sol";
@@ -18,13 +18,13 @@ interface IDistributor {
     function distribute() external returns ( bool );
 }
 
-contract OtterStaking is Ownable, IOtterStaking {
+contract BibimbapStaking is Ownable, IBibimbapStaking {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    address public immutable CLAM;
-    address public immutable sCLAM;
+    address public immutable BBB;
+    address public immutable sBBB;
 
     struct Epoch {
         uint length; // in seconds
@@ -43,16 +43,16 @@ contract OtterStaking is Ownable, IOtterStaking {
     uint public warmupPeriod;
 
     constructor (
-        address _CLAM,
-        address _sCLAM,
+        address _BBB,
+        address _sBBB,
         uint _epochLength,
         uint _firstEpochNumber,
         uint _firstEpochTime
     ) {
-        require( _CLAM != address(0) );
-        CLAM = _CLAM;
-        require( _sCLAM != address(0) );
-        sCLAM = _sCLAM;
+        require( _BBB != address(0) );
+        BBB = _BBB;
+        require( _sBBB != address(0) );
+        sBBB = _sBBB;
 
         epoch = Epoch({
             length: _epochLength,
@@ -71,50 +71,50 @@ contract OtterStaking is Ownable, IOtterStaking {
     mapping( address => Claim ) public warmupInfo;
 
     /**
-        @notice stake CLAM to enter warmup
+        @notice stake BBB to enter warmup
         @param _amount uint
         @return bool
      */
     function stake( uint _amount, address _recipient ) external override returns ( bool ) {
         rebase();
 
-        IERC20( CLAM ).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20( BBB ).safeTransferFrom( msg.sender, address(this), _amount );
 
         Claim memory info = warmupInfo[ _recipient ];
         require( !info.lock, "Deposits for account are locked" );
 
         warmupInfo[ _recipient ] = Claim ({
             deposit: info.deposit.add( _amount ),
-            gons: info.gons.add( IsCLAM( sCLAM ).gonsForBalance( _amount ) ),
+            gons: info.gons.add( IsBBB( sBBB ).gonsForBalance( _amount ) ),
             expiry: epoch.number.add( warmupPeriod ),
             lock: false
         });
 
-        IERC20( sCLAM ).safeTransfer( warmupContract, _amount );
+        IERC20( sBBB ).safeTransfer( warmupContract, _amount );
         return true;
     }
 
     /**
-        @notice retrieve sCLAM from warmup
+        @notice retrieve sBBB from warmup
         @param _recipient address
      */
     function claim ( address _recipient ) external override {
         Claim memory info = warmupInfo[ _recipient ];
         if ( epoch.number >= info.expiry && info.expiry != 0 ) {
             delete warmupInfo[ _recipient ];
-            IWarmup( warmupContract ).retrieve( _recipient, IsCLAM( sCLAM ).balanceForGons( info.gons ) );
+            IWarmup( warmupContract ).retrieve( _recipient, IsBBB( sBBB ).balanceForGons( info.gons ) );
         }
     }
 
     /**
-        @notice forfeit sCLAM in warmup and retrieve CLAM
+        @notice forfeit sBBB in warmup and retrieve BBB
      */
     function forfeit() external {
         Claim memory info = warmupInfo[ msg.sender ];
         delete warmupInfo[ msg.sender ];
 
-        IWarmup( warmupContract ).retrieve( address(this), IsCLAM( sCLAM ).balanceForGons( info.gons ) );
-        IERC20( CLAM ).safeTransfer( msg.sender, info.deposit );
+        IWarmup( warmupContract ).retrieve( address(this), IsBBB( sBBB ).balanceForGons( info.gons ) );
+        IERC20( BBB ).safeTransfer( msg.sender, info.deposit );
     }
 
     /**
@@ -125,7 +125,7 @@ contract OtterStaking is Ownable, IOtterStaking {
     }
 
     /**
-        @notice redeem sCLAM for CLAM
+        @notice redeem sBBB for BBB
         @param _amount uint
         @param _trigger bool
      */
@@ -133,16 +133,16 @@ contract OtterStaking is Ownable, IOtterStaking {
         if ( _trigger ) {
             rebase();
         }
-        IERC20( sCLAM ).safeTransferFrom( msg.sender, address(this), _amount );
-        IERC20( CLAM ).safeTransfer( msg.sender, _amount );
+        IERC20( sBBB ).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20( BBB ).safeTransfer( msg.sender, _amount );
     }
 
     /**
-        @notice returns the sCLAM index, which tracks rebase growth
+        @notice returns the sBBB index, which tracks rebase growth
         @return uint
      */
     function index() public view returns ( uint ) {
-        return IsCLAM( sCLAM ).index();
+        return IsBBB( sBBB ).index();
     }
 
     /**
@@ -150,7 +150,7 @@ contract OtterStaking is Ownable, IOtterStaking {
      */
     function rebase() public {
         if( epoch.endTime <= block.timestamp ) {
-            IsCLAM( sCLAM ).rebase( epoch.distribute, epoch.number );
+            IsBBB( sBBB ).rebase( epoch.distribute, epoch.number );
 
             epoch.endTime = epoch.endTime.add( epoch.length );
             epoch.number++;
@@ -160,7 +160,7 @@ contract OtterStaking is Ownable, IOtterStaking {
             }
 
             uint balance = contractBalance();
-            uint staked = IsCLAM( sCLAM ).circulatingSupply();
+            uint staked = IsBBB( sBBB ).circulatingSupply();
 
             if( balance <= staked ) {
                 epoch.distribute = 0;
@@ -171,11 +171,11 @@ contract OtterStaking is Ownable, IOtterStaking {
     }
 
     /**
-        @notice returns contract CLAM holdings, including bonuses provided
+        @notice returns contract BBB holdings, including bonuses provided
         @return uint
      */
     function contractBalance() public view returns ( uint ) {
-        return IERC20( CLAM ).balanceOf( address(this) ).add( totalBonus );
+        return IERC20( BBB ).balanceOf( address(this) ).add( totalBonus );
     }
 
     /**
@@ -185,7 +185,7 @@ contract OtterStaking is Ownable, IOtterStaking {
     function giveLockBonus( uint _amount ) external {
         require( msg.sender == locker );
         totalBonus = totalBonus.add( _amount );
-        IERC20( sCLAM ).safeTransfer( locker, _amount );
+        IERC20( sBBB ).safeTransfer( locker, _amount );
     }
 
     /**
@@ -195,7 +195,7 @@ contract OtterStaking is Ownable, IOtterStaking {
     function returnLockBonus( uint _amount ) external {
         require( msg.sender == locker );
         totalBonus = totalBonus.sub( _amount );
-        IERC20( sCLAM ).safeTransferFrom( locker, address(this), _amount );
+        IERC20( sBBB ).safeTransferFrom( locker, address(this), _amount );
     }
 
     enum CONTRACTS { DISTRIBUTOR, WARMUP, LOCKER }

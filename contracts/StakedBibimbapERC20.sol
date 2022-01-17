@@ -5,7 +5,7 @@ import "./types/ERC20.sol";
 import "./types/Ownable.sol";
 
 
-contract StakedOtterClamERC20 is ERC20Permit, Ownable {
+contract StakedBibimbapERC20 is ERC20Permit, Ownable {
 
     using SafeMath for uint256;
 
@@ -49,7 +49,7 @@ contract StakedOtterClamERC20 is ERC20Permit, Ownable {
 
     mapping ( address => mapping ( address => uint256 ) ) private _allowedValue;
 
-    constructor() ERC20("Staked Clam", "sCLAM", 9) ERC20Permit() {
+    constructor() ERC20("Staked Bibimbap", "sBBB", 9) ERC20Permit() {
         initializer = msg.sender;
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
@@ -75,7 +75,7 @@ contract StakedOtterClamERC20 is ERC20Permit, Ownable {
     }
 
     /**
-        @notice increases sCLAM supply to increase staking balances relative to profit_
+        @notice increases sBBB supply to increase staking balances relative to profit_
         @param profit_ uint256
         @return uint256
      */
@@ -144,7 +144,7 @@ contract StakedOtterClamERC20 is ERC20Permit, Ownable {
         return gons.div( _gonsPerFragment );
     }
 
-    // Staking contract holds excess sCLAM
+    // Staking contract holds excess sBBB
     function circulatingSupply() public view returns ( uint ) {
         return _totalSupply.sub( balanceOf( stakingContract ) );
     }

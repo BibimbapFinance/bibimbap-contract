@@ -163,14 +163,14 @@ interface IStaking {
     function stake(uint256 _amount, address _recipient) external returns (bool);
 }
 
-contract OtterClamIDO is Ownable {
+contract BibimbapIDO is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    address public CLAM;
+    address public BBB;
     address public MAI;
     address public addressToSendMAI;
-    address public maiClamLP;
+    address public maiBBBLP;
     address public staking;
 
     uint256 public totalAmount;
@@ -185,7 +185,7 @@ contract OtterClamIDO is Ownable {
     bool public cancelled;
     bool public finalized;
 
-    mapping(address => bool) public boughtCLAM;
+    mapping(address => bool) public boughtBBB;
     mapping(address => bool) public whiteListed;
 
     address[] buyers;
@@ -196,22 +196,22 @@ contract OtterClamIDO is Ownable {
     address uniswapRouter = address(0x95Af219beFfFc3A9199fE2E997A2029DA1880C22);
 
     constructor(
-        address _CLAM,
+        address _BBB,
         address _MAI,
         address _treasury,
         address _staking,
-        address _maiClamLP
+        address _maiBBBLP
     ) {
-        require(_CLAM != address(0));
+        require(_BBB != address(0));
         require(_MAI != address(0));
         require(_treasury != address(0));
         require(_staking != address(0));
-        require(_maiClamLP != address(0));
+        require(_maiBBBLP != address(0));
 
-        CLAM = _CLAM;
+        BBB = _BBB;
         MAI = _MAI;
         treasury = _treasury;
-        maiClamLP = _maiClamLP;
+        maiBBBLP = _maiBBBLP;
         staking = _staking;
         cancelled = false;
         finalized = false;
@@ -261,15 +261,15 @@ contract OtterClamIDO is Ownable {
         }
     }
 
-    function purchaseCLAM(uint256 _amountMAI) external returns (bool) {
+    function purchaseBBB(uint256 _amountMAI) external returns (bool) {
         require(saleStarted() == true, 'Not started');
         require(
             !whiteListEnabled || whiteListed[msg.sender] == true,
             'Not whitelisted'
         );
-        require(boughtCLAM[msg.sender] == false, 'Already participated');
+        require(boughtBBB[msg.sender] == false, 'Already participated');
 
-        boughtCLAM[msg.sender] = true;
+        boughtBBB[msg.sender] = true;
 
         uint256 _purchaseAmount = _calculateSaleQuote(_amountMAI);
 
@@ -328,80 +328,33 @@ contract OtterClamIDO is Ownable {
         purchasedAmounts[_recipient] = 0;
     }
 
-    function finalize2(address _receipt) external onlyOwner {
-        require(totalAmount == 0, 'need all clams to be sold');
-
-        uint256 maiInTreasure = 250000 * 1e18;
-
-        IERC20(MAI).approve(treasury, maiInTreasure);
-        uint256 clamMinted = ITreasury(treasury).deposit(maiInTreasure, MAI, 0);
-
-        require(clamMinted == 250000 * 1e9);
-
-        // dev: create lp with 15 MAI per CLAM
-
-        IERC20(MAI).approve(uniswapRouter, 750000 * 1e18);
-        IERC20(CLAM).approve(uniswapRouter, 50000 * 1e9);
-
-        (uint amount1, uint amount2, uint lpBalance) = IUniswapV2Router02(uniswapRouter).addLiquidity(
-            MAI,
-            CLAM,
-            750000 * 1e18,
-            50000 * 1e9,
-            750000 * 1e18,
-            50000 * 1e9,
-            address(this),
-            1000000000000
-        );
-        // IERC20(MAI).transfer(maiClamLP, 750000 * 1e18);
-        // IERC20(CLAM).transfer(maiClamLP, 50000 * 1e9);
-        // uint256 lpBalance = IUniswapV2Pair(maiClamLP).mint(address(this));
-        uint256 valueOfToken = ITreasury(treasury).valueOfToken(
-            maiClamLP,
-            lpBalance
-        );
-
-        IUniswapV2Pair(maiClamLP).approve(treasury, lpBalance);
-        uint256 zeroMinted = ITreasury(treasury).deposit(
-            lpBalance,
-            maiClamLP,
-            valueOfToken
-        );
-        require(zeroMinted == 0, 'should not mint any CLAM');
-        IERC20(CLAM).approve(staking, clamMinted);
-
-        finalized = true;
-
-        claim(_receipt);
-    }
-
     function finalize(address _receipt) external onlyOwner {
-        require(totalAmount == 0, 'need all clams to be sold');
+        require(totalAmount == 0, 'need all BBBs to be sold');
 
         uint256 maiInTreasure = 250000 * 1e18;
 
         IERC20(MAI).approve(treasury, maiInTreasure);
-        uint256 clamMinted = ITreasury(treasury).deposit(maiInTreasure, MAI, 0);
+        uint256 BBBMinted = ITreasury(treasury).deposit(maiInTreasure, MAI, 0);
 
-        require(clamMinted == 250000 * 1e9);
+        require(BBBMinted == 250000 * 1e9);
 
-        // dev: create lp with 15 MAI per CLAM
-        IERC20(MAI).transfer(maiClamLP, 750000 * 1e18);
-        IERC20(CLAM).transfer(maiClamLP, 50000 * 1e9);
-        uint256 lpBalance = IUniswapV2Pair(maiClamLP).mint(address(this));
+        // dev: create lp with 15 MAI per BBB
+        IERC20(MAI).transfer(maiBBBLP, 750000 * 1e18);
+        IERC20(BBB).transfer(maiBBBLP, 50000 * 1e9);
+        uint256 lpBalance = IUniswapV2Pair(maiBBBLP).mint(address(this));
         uint256 valueOfToken = ITreasury(treasury).valueOfToken(
-            maiClamLP,
+            maiBBBLP,
             lpBalance
         );
 
-        IUniswapV2Pair(maiClamLP).approve(treasury, lpBalance);
+        IUniswapV2Pair(maiBBBLP).approve(treasury, lpBalance);
         uint256 zeroMinted = ITreasury(treasury).deposit(
             lpBalance,
-            maiClamLP,
+            maiBBBLP,
             valueOfToken
         );
-        require(zeroMinted == 0, 'should not mint any CLAM');
-        IERC20(CLAM).approve(staking, clamMinted);
+        require(zeroMinted == 0, 'should not mint any BBB');
+        IERC20(BBB).approve(staking, BBBMinted);
 
         finalized = true;
 
