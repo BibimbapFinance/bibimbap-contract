@@ -11,10 +11,10 @@ contract NFTAirdrop {
         bibimbap = _bibimbap;
     }
 
-    function airdrop(address[] memory recipients) public {
+    function airdrop(address[] memory recipients, uint amount) public {
         // require(IERC1155(bibimbap).isApprovedForAll(msg.sender, address(this)), "not approved yet!");
         for (uint i = 0; i < recipients.length; i++) {
-            IERC1155(bibimbap).safeTransferFrom(msg.sender, address(recipients[i]), 1, 1, "");
+            IERC1155(bibimbap).safeTransferFrom(msg.sender, address(recipients[i]), 1, amount, "");
         }
     }
 }

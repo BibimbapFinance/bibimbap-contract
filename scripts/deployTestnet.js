@@ -63,7 +63,7 @@ async function main() {
   // Initial Bond debt
   const initialBondDebt = '0'
 
-  const warmupPeriod = '3'
+  const warmupPeriod = '0'
 
   const chainId = (await provider.getNetwork()).chainId
 
